@@ -24,7 +24,7 @@ with open(filename, 'w') as file:
                 try:
                     value = int(line)
                     # Write the line to the file
-                    file.write(line + '    ' + str(i) + '\n')
+                    file.write(line + '\n')
                     file.flush()  # Flush the buffer to ensure data is written immediately
                 except ValueError:
                     pass

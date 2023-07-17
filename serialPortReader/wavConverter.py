@@ -1,37 +1,27 @@
-import struct
 import wave
+import struct
 
-# Audio parameters
-sample_rate = 8000
-channels = 2
-sample_width = 2  # 16-bit audio
+def convert_to_wav(input_file, output_file, num_channels, sample_width, frame_rate):
+    with open(input_file, 'r') as infile:
+        lines = infile.readlines()
+    audio_data = [int(line.strip()) for line in lines]
 
-# Read the data from the text file
-with open('data.txt', 'r') as file:
-    audio_data = [int(line.strip()) for line in file]
-
-# Open a WAV file for writing
-with wave.open('audio.wav', 'wb') as wav_file:
-    wav_file.setnchannels(channels)
+    wav_file = wave.open(output_file, 'w')
+    wav_file.setnchannels(num_channels)
     wav_file.setsampwidth(sample_width)
-    wav_file.setframerate(sample_rate)
+    wav_file.setframerate(frame_rate)
 
-    # Convert and write the audio data to the WAV file
-    for sample in audio_data:
-        # Split the sample into left and right channels
-        left_sample = sample & 0xFFFF
-        right_sample = (sample >> 16) & 0xFFFF
+    # Convert the audio data to bytes in little-endian format (PCM)
+    audio_bytes = struct.pack('<' + ('h' * len(audio_data)), *audio_data)
+    wav_file.writeframes(audio_bytes)
+    wav_file.close()
 
-        # Handle signed conversion for 16-bit range (-32768 to 32767)
-        if left_sample >= 32768:
-            left_sample -= 65536
-        if right_sample >= 32768:
-            right_sample -= 65536
+if __name__ == "__main__":
+    # Replace these values with the appropriate information about your input audio file
+    input_file = 'data.txt'
+    output_file = 'audio.wav'
+    num_channels = 2  # Change this to 1 for mono or 2 for stereo
+    sample_width = 4  # Size of each sample in bytes (e.g., 2 for 16-bit audio, 4 for 32-bit audio)
+    frame_rate = 44100  # Number of samples per second (e.g., 44100 for CD-quality audio)
 
-        # Pack the samples as little-endian 16-bit signed integers
-        left_bytes = struct.pack('<h', left_sample)
-        right_bytes = struct.pack('<h', right_sample)
-
-        # Write the samples to the WAV file
-        wav_file.writeframes(left_bytes)
-        wav_file.writeframes(right_bytes)
+    convert_to_wav(input_file, output_file, num_channels, sample_width, frame_rate)
