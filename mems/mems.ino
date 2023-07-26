@@ -1,5 +1,6 @@
 #include <driver/i2s.h>
 #include "soc/i2s_reg.h"
+#include <driver/dac.h>
 
 // I2S configuration
 const int I2S_NUM = 0;               // I2S port number
@@ -9,6 +10,13 @@ const int CHANNELS = 1;              // Number of channels (stereo)
 
 volatile int32_t buff[10000] = {0};
 volatile int i = 0;
+
+// Map a 16-bit signed sample to an 8-bit unsigned value for DAC output
+uint8_t mapToDACValue(int32_t sample) {
+  return map(sample, -2147483648, 2147483647, 0, 255);
+}
+
+
 
 void setup() {
   Serial.begin(115200);
@@ -28,6 +36,9 @@ void setup() {
 
   REG_SET_BIT(I2S_TIMING_REG(I2S_NUM), BIT(9));
   REG_SET_BIT(I2S_CONF_REG(I2S_NUM), I2S_RX_MSB_SHIFT);
+
+  // Configure DAC1
+  dac_output_enable(DAC_CHANNEL_1);
 
 
   i2s_driver_install((i2s_port_t)I2S_NUM, &i2s_config, 0, NULL);
@@ -65,11 +76,16 @@ void loop() {
   //}
   //delay(100);
 
-  if (i + 1 < 10000) {
+  if (i + 1 < 1000) {
     buff[i] = adjustedSampleL;
     buff[i+1] = adjustedSampleR;
     i += 2;
   } else {
+    i = 0;
+    while (i < 1000) {
+      dac_output_voltage(DAC_CHANNEL_1, mapToDACValue(buff[i]));
+      i++;
+    }
     i = 0;
   }
 
