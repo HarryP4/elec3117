@@ -1,33 +1,41 @@
 #include <driver/i2s.h>
+#include "soc/i2s_reg.h"
 
 // I2S configuration
 const int I2S_NUM = 0;               // I2S port number
 const int SAMPLE_RATE = 44100;       // Sample rate (Hz)
-const int BITS_PER_SAMPLE = 64;      // Bits per sample
-const int CHANNELS = 2;              // Number of channels (stereo)
+const int BITS_PER_SAMPLE = 32;      // Bits per sample
+const int CHANNELS = 1;              // Number of channels (stereo)
+
+volatile int32_t buff[10000] = {0};
+volatile int i = 0;
 
 void setup() {
   Serial.begin(115200);
-
   // Configure I2S
   i2s_config_t i2s_config = {
     .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
     .sample_rate = SAMPLE_RATE,
     .bits_per_sample = I2S_BITS_PER_SAMPLE_24BIT,  // Use 24-bit I2S format
-    .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,  // Receive both channels
-    .communication_format = I2S_COMM_FORMAT_I2S_MSB,
+    .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,  // Receive both channels
+    .communication_format = I2S_COMM_FORMAT_STAND_I2S,
     .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
     .dma_buf_count = 8,
     .dma_buf_len = 64,
-    .use_apll = false
+    .use_apll = false,
+    .bits_per_chan = I2S_BITS_PER_CHAN_32BIT
   };
+
+  REG_SET_BIT(I2S_TIMING_REG(I2S_NUM), BIT(9));
+  REG_SET_BIT(I2S_CONF_REG(I2S_NUM), I2S_RX_MSB_SHIFT);
+
 
   i2s_driver_install((i2s_port_t)I2S_NUM, &i2s_config, 0, NULL);
 
   // Set pin configurations
   i2s_pin_config_t pin_config = {
-    .bck_io_num = 26,      // BCKL
-    .ws_io_num = 25,       // LRCL
+    .bck_io_num = 14,      // BCKL
+    .ws_io_num = 12,       // LRCL
     .data_out_num = -1,    // Not used in receiver mode
     .data_in_num = 33      // DOUT
   };
@@ -35,16 +43,34 @@ void setup() {
 }
 
 void loop() {
-  uint8_t sample[3];
+  uint8_t sample[8] = {0};
   size_t bytes_read = 0;
 
   // Read a sample from I2S
   i2s_read((i2s_port_t)I2S_NUM, &sample, sizeof(sample), &bytes_read, portMAX_DELAY);
 
   // Adjust the sample to keep only the 18-bit value
-  int32_t adjustedSample = ((sample[0] << 16) | (sample[1] << 8) | sample[2]) >> 6;
+  int32_t adjustedSampleL = ((sample[0] << 16) | (sample[1] << 8) | sample[2]) >> 6;
+  int32_t adjustedSampleR = ((sample[4] << 16) | (sample[5] << 8) | sample[6]) >> 6;
 
-  // Print the sample value
-  Serial.println(adjustedSample);
-//  delay(100);
+
+  // Print the sample values
+  //if (adjustedSampleL && adjustedSampleL != -1 && adjustedSampleL != 1) {
+    Serial.print(adjustedSampleL, BIN);
+    Serial.print("\n");
+  //}
+  //if (adjustedSampleR && adjustedSampleR != -1 && adjustedSampleR != 1) {
+    Serial.print(adjustedSampleR, BIN);
+    Serial.print("\n");
+  //}
+  //delay(100);
+
+  if (i + 1 < 10000) {
+    buff[i] = adjustedSampleL;
+    buff[i+1] = adjustedSampleR;
+    i += 2;
+  } else {
+    i = 0;
+  }
+
 }
